@@ -11,8 +11,9 @@
 using namespace std;
 using std::chrono::system_clock;
 using namespace std::this_thread;
-char direction='r';
 
+char direction = 'r';
+bool paused = false; // NEW: track pause state
 
 void input_handler(){
     // change terminal settings
@@ -22,20 +23,22 @@ void input_handler(){
     // turn off canonical mode and echo
     newt.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    map<char, char> keymap = {{'d', 'r'}, {'a', 'l'}, {'w', 'u'}, {'s', 'd'}, {'q', 'q'}};
+
+    map<char, char> keymap = {{'d', 'r'}, {'a', 'l'}, {'w', 'u'}, {'s', 'd'}};
+
     while (true) {
         char input = getchar();
+
         if (keymap.find(input) != keymap.end()) {
-            // This now correctly modifies the single, shared 'direction' variable
-            direction = keymap[input];
-        }else if (input == 'q'){
+            if (!paused) direction = keymap[input]; // movement only when not paused
+        } else if (input == 'q') {
             exit(0);
+        } else if (input == 'p') {
+            paused = !paused; // toggle pause/resume
         }
-        // You could add an exit condition here, e.g., if (input == 'q') break;
     }
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 }
-
 
 void render_game(int size, deque<pair<int, int>> &snake, pair<int, int> food, pair<int, int> poison){
     for(size_t i=0;i<size;i++){
@@ -58,14 +61,13 @@ pair<int,int> get_next_head(pair<int,int> current, char direction){
     pair<int, int> next; 
     if(direction =='r'){
         next = make_pair(current.first,(current.second+1) % 10);
-    }else if (direction=='l')
-    {
+    }else if (direction=='l'){
         next = make_pair(current.first, current.second==0?9:current.second-1);
     }else if(direction =='d'){
-            next = make_pair((current.first+1)%10,current.second);
-        }else if (direction=='u'){
-            next = make_pair(current.first==0?9:current.first-1, current.second);
-        }
+        next = make_pair((current.first+1)%10,current.second);
+    }else if (direction=='u'){
+        next = make_pair(current.first==0?9:current.first-1, current.second);
+    }
     return next;
 }
 
@@ -77,7 +79,6 @@ pair<int,int> generate_item(const deque<pair<int,int>> &snake, pair<int,int> oth
     } while(find(snake.begin(), snake.end(), pos) != snake.end() || pos == other); 
     return pos;
 }
-
 
 void game_play(){
     system("clear");
@@ -96,6 +97,15 @@ void game_play(){
 
     for(pair<int, int> head=make_pair(0,1);; head = get_next_head(head, direction)){
         cout << "\033[H"; // send cursor to top-left
+
+        if (paused) {
+            render_game(10, snake, food, poison);
+            cout << "length of snake: " << snake.size() << endl;
+            cout << "score: " << score << endl;
+            cout << "[PAUSED] Press 'p' to resume" << endl;
+            sleep_for(chrono::milliseconds(200)); // small delay to avoid CPU hogging
+            continue; // skip movement while paused
+        }
 
         if (find(snake.begin(), snake.end(), head) != snake.end()) {
             system("clear");
