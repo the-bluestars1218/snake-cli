@@ -68,6 +68,14 @@ pair<int,int> get_next_head(pair<int,int> current, char direction){
     
 }
 
+// helper: generate new food not inside snake
+pair<int,int> generate_food(const deque<pair<int,int>> &snake, int size=10){
+    pair<int,int> food;
+    do {
+        food = make_pair(rand() % size, rand() % size);
+    } while(find(snake.begin(), snake.end(), food) != snake.end()); 
+    return food;
+}
 
 
 void game_play(){
@@ -75,7 +83,7 @@ void game_play(){
     deque<pair<int, int>> snake;
     snake.push_back(make_pair(0,0));
 
-    pair<int, int> food = make_pair(rand() % 10, rand() % 10);
+    pair<int, int> food = generate_food(snake); // ensures no overlap with snake
 
     int speed = 500;      // initial speed in ms
     const int min_speed = 100;  // max difficulty
@@ -91,8 +99,8 @@ void game_play(){
         } else if (head.first == food.first && head.second == food.second) {
             snake.push_back(head);
 
-            // spawn new food
-            food = make_pair(rand() % 10, rand() % 10);
+            // spawn new food (not inside snake)
+            food = generate_food(snake);
 
             // increase difficulty
             speed -= decrement;
