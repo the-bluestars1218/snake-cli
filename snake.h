@@ -13,7 +13,8 @@ using std::chrono::system_clock;
 using namespace std::this_thread;
 
 char direction = 'r';
-bool paused = false; // NEW: track pause state
+bool paused = false; // track pause state
+vector<int> high_scores; // NEW: top 10 scores
 
 void input_handler(){
     // change terminal settings
@@ -80,6 +81,18 @@ pair<int,int> generate_item(const deque<pair<int,int>> &snake, pair<int,int> oth
     return pos;
 }
 
+// NEW: update and print top 10 scores
+void update_high_scores(int score) {
+    high_scores.push_back(score);
+    sort(high_scores.begin(), high_scores.end(), greater<int>()); // sort descending
+    if (high_scores.size() > 10) high_scores.pop_back(); // keep only top 10
+
+    cout << "\n=== High Scores ===" << endl;
+    for (size_t i = 0; i < high_scores.size(); i++) {
+        cout << i+1 << ". " << high_scores[i] << endl;
+    }
+}
+
 void game_play(){
     system("clear");
     deque<pair<int, int>> snake;
@@ -103,13 +116,14 @@ void game_play(){
             cout << "length of snake: " << snake.size() << endl;
             cout << "score: " << score << endl;
             cout << "[PAUSED] Press 'p' to resume" << endl;
-            sleep_for(chrono::milliseconds(200)); // small delay to avoid CPU hogging
-            continue; // skip movement while paused
+            sleep_for(chrono::milliseconds(200));
+            continue;
         }
 
         if (find(snake.begin(), snake.end(), head) != snake.end()) {
             system("clear");
             cout << "Game Over! Final Score: " << score << endl;
+            update_high_scores(score);
             exit(0);
         } else if (head == food) {
             snake.push_back(head);
@@ -126,6 +140,7 @@ void game_play(){
         } else if (head == poison) {
             system("clear");
             cout << "You ate poison! Game Over. Final Score: " << score << endl;
+            update_high_scores(score);
             exit(0);
         } else {
             snake.push_back(head);
