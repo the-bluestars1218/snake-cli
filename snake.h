@@ -15,29 +15,35 @@ char direction='r';
 
 
 void input_handler(){
+    // change terminal settings
     struct termios oldt, newt;
     tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
+    // turn off canonical mode and echo
     newt.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
     map<char, char> keymap = {{'d', 'r'}, {'a', 'l'}, {'w', 'u'}, {'s', 'd'}, {'q', 'q'}};
     while (true) {
         char input = getchar();
         if (keymap.find(input) != keymap.end()) {
+            // This now correctly modifies the single, shared 'direction' variable
             direction = keymap[input];
-        } else if (input == 'q'){
+        }else if (input == 'q'){
             exit(0);
         }
+        // You could add an exit condition here, e.g., if (input == 'q') break;
     }
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 }
 
 
-void render_game(int size, deque<pair<int, int>> &snake, pair<int, int> food, int score){
+void render_game(int size, deque<pair<int, int>> &snake, pair<int, int> food, pair<int, int> poison){
     for(size_t i=0;i<size;i++){
         for(size_t j=0;j<size;j++){
             if (i == food.first && j == food.second){
                 cout << "🍎";
+            }else if (i == poison.first && j == poison.second){
+                cout << "💀";
             }else if (find(snake.begin(), snake.end(), make_pair(int(i), int(j))) != snake.end()) {
                 cout << "🐍";
             }else{
@@ -46,29 +52,30 @@ void render_game(int size, deque<pair<int, int>> &snake, pair<int, int> food, in
         }
         cout << endl;
     }
-    cout << "Length of snake: " << snake.size() << " | Score: " << score << endl;
 }
 
 pair<int,int> get_next_head(pair<int,int> current, char direction){
     pair<int, int> next; 
     if(direction =='r'){
         next = make_pair(current.first,(current.second+1) % 10);
-    }else if (direction=='l'){
+    }else if (direction=='l')
+    {
         next = make_pair(current.first, current.second==0?9:current.second-1);
     }else if(direction =='d'){
-        next = make_pair((current.first+1)%10,current.second);
-    }else if (direction=='u'){
-        next = make_pair(current.first==0?9:current.first-1, current.second);
-    }
+            next = make_pair((current.first+1)%10,current.second);
+        }else if (direction=='u'){
+            next = make_pair(current.first==0?9:current.first-1, current.second);
+        }
     return next;
 }
 
-pair<int,int> generate_food(const deque<pair<int,int>> &snake, int size=10){
-    pair<int,int> food;
+// helper: generate new item not inside snake
+pair<int,int> generate_item(const deque<pair<int,int>> &snake, pair<int,int> other, int size=10){
+    pair<int,int> pos;
     do {
-        food = make_pair(rand() % size, rand() % size);
-    } while(find(snake.begin(), snake.end(), food) != snake.end()); 
-    return food;
+        pos = make_pair(rand() % size, rand() % size);
+    } while(find(snake.begin(), snake.end(), pos) != snake.end() || pos == other); 
+    return pos;
 }
 
 
@@ -77,35 +84,53 @@ void game_play(){
     deque<pair<int, int>> snake;
     snake.push_back(make_pair(0,0));
 
-    pair<int, int> food = generate_food(snake);
+    pair<int, int> food = generate_item(snake, {-1,-1});   // ensures no overlap
+    pair<int, int> poison = generate_item(snake, food);    // separate from snake & food
 
-    int speed = 500;      
-    const int min_speed = 100;  
-    const int decrement = 20;   
+    int score = 0;      // track score
+    int moves = 0;      // track moves for poison relocation
 
-    int score = 0;  // NEW: track score
+    int speed = 500;      // initial speed in ms
+    const int min_speed = 100;  // max difficulty
+    const int decrement = 20;   // speed decrease per growth
 
     for(pair<int, int> head=make_pair(0,1);; head = get_next_head(head, direction)){
-        cout << "\033[H"; 
+        cout << "\033[H"; // send cursor to top-left
 
         if (find(snake.begin(), snake.end(), head) != snake.end()) {
             system("clear");
-            cout << "Game Over" << endl;
-            cout << "Final Score: " << score << endl; // show score at end
+            cout << "Game Over! Final Score: " << score << endl;
             exit(0);
-        } else if (head.first == food.first && head.second == food.second) {
+        } else if (head == food) {
             snake.push_back(head);
-            food = generate_food(snake);
+
+            // spawn new food
+            food = generate_item(snake, poison);
+
+            // increase difficulty
             speed -= decrement;
             if(speed < min_speed) speed = min_speed;
 
-            score += 10;  // NEW: +10 per food eaten
+            // update score
+            score += 10;
+        } else if (head == poison) {
+            system("clear");
+            cout << "You ate poison! Game Over. Final Score: " << score << endl;
+            exit(0);
         } else {
             snake.push_back(head);
             snake.pop_front();
         }
 
-        render_game(10, snake, food, score);
+        // relocate poison every 5 moves
+        moves++;
+        if (moves % 5 == 0) {
+            poison = generate_item(snake, food);
+        }
+
+        render_game(10, snake, food, poison);
+        cout << "length of snake: " << snake.size() << endl;
+        cout << "score: " << score << endl;
 
         sleep_for(chrono::milliseconds(speed));
     }
