@@ -76,26 +76,35 @@ void game_play(){
     snake.push_back(make_pair(0,0));
 
     pair<int, int> food = make_pair(rand() % 10, rand() % 10);
+
+    int speed = 500;      // initial speed in ms
+    const int min_speed = 100;  // max difficulty
+    const int decrement = 20;   // speed decrease per growth
+
     for(pair<int, int> head=make_pair(0,1);; head = get_next_head(head, direction)){
-        // send the cursor to the top
-        cout << "\033[H";
-        // check self collision
+        cout << "\033[H"; // send cursor to top-left
+
         if (find(snake.begin(), snake.end(), head) != snake.end()) {
             system("clear");
             cout << "Game Over" << endl;
             exit(0);
-        }else if (head.first == food.first && head.second == food.second) {
-            // grow snake
+        } else if (head.first == food.first && head.second == food.second) {
+            snake.push_back(head);
+
+            // spawn new food
             food = make_pair(rand() % 10, rand() % 10);
-            snake.push_back(head);            
-        }else{
-            // move snake
+
+            // increase difficulty
+            speed -= decrement;
+            if(speed < min_speed) speed = min_speed;
+        } else {
             snake.push_back(head);
             snake.pop_front();
         }
+
         render_game(10, snake, food);
         cout << "length of snake: " << snake.size() << endl;
-    
-        sleep_for(500ms);
+
+        sleep_for(chrono::milliseconds(speed));
     }
 }
